@@ -163,3 +163,52 @@ class EDAProcessor:
                 df_clean = df_clean.drop(res['indices'], errors='ignore')
                 
         return df_clean
+
+    def generate_insights(self):
+        """
+        Генерирует список текстовых выводов и предупреждений о данных.
+        """
+        insights = []
+        
+        # 1. Проверка на пропуски
+        missing = self.df.isnull().sum()
+        for col, count in missing.items():
+            if count > 0:
+                pct = (count / len(self.df)) * 100
+                if pct > 50:
+                    insights.append({"type": "danger", "msg": f"Столбец '{col}' содержит {pct:.1f}% пропусков. Рекомендуется удаление."})
+                elif pct > 5:
+                    insights.append({"type": "warning", "msg": f"Столбец '{col}' имеет {pct:.1f}% пропусков. Требуется импутация (заполнение)."})
+
+        # 2. Проверка на константные столбцы (одно значение везде)
+        for col in self.df.columns:
+            if self.df[col].nunique() <= 1:
+                insights.append({"type": "danger", "msg": f"Столбец '{col}' содержит только одно значение. Он не несет информации."})
+
+        # 3. Проверка высокой корреляции (Мультиколлинеарность)
+        if len(self.numeric_cols) > 1:
+            corr_matrix = self.df[self.numeric_cols].corr().abs()
+            # Выбираем только верхний треугольник матрицы, чтобы не дублировать пары
+            upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
+            
+            # Ищем пары с корреляцией > 0.85
+            to_drop = [column for column in upper.columns if any(upper[column] > 0.85)]
+            
+            for col in to_drop:
+                # Находим с чем коррелирует
+                high_corr_col = upper[col][upper[col] > 0.85].index.tolist()
+                for c in high_corr_col:
+                    insights.append({"type": "info", "msg": f"Сильная корреляция между '{col}' и '{c}'. Возможно, стоит оставить только один из них."})
+
+        # 4. Проверка категориального дисбаланса
+        for col in self.categorical_cols:
+            if self.df[col].nunique() < 20: # Проверяем только если категорий не слишком много
+                top_freq = self.df[col].value_counts(normalize=True).iloc[0]
+                if top_freq > 0.9:
+                     insights.append({"type": "warning", "msg": f"В столбце '{col}' одно значение встречается в {top_freq:.1%}% случаев (сильный дисбаланс)."})
+
+        # 5. Сводка
+        if not insights:
+            insights.append({"type": "success", "msg": "Явных проблем в структуре данных не обнаружено."})
+            
+        return insights

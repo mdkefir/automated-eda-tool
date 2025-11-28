@@ -43,6 +43,22 @@ if uploaded_file is not None:
         # === ВКЛАДКА 1: ОБЗОР ===
         with tab1:
             st.subheader("Общая информация")
+            # --- Блок Инсайтов ---
+            st.subheader("💡 Автоматические выводы")
+            insights = processor.generate_insights()
+            
+            for item in insights:
+                if item["type"] == "danger":
+                    st.error(f"❌ {item['msg']}")
+                elif item["type"] == "warning":
+                    st.warning(f"⚠️ {item['msg']}")
+                elif item["type"] == "info":
+                    st.info(f"ℹ️ {item['msg']}")
+                elif item["type"] == "success":
+                    st.success(f"✅ {item['msg']}")
+            
+            st.divider() # Горизонтальная линия для красоты
+            # ---------------------
             col1, col2, col3 = st.columns(3)
             rows, cols = processor.get_shape()
             
