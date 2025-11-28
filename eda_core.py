@@ -122,3 +122,44 @@ class EDAProcessor:
         if len(self.numeric_cols) > 1:
             return self.df[self.numeric_cols].corr()
         return None
+
+    def detect_outliers(self, column):
+        """
+        Определяет выбросы методом IQR (Межквартильный размах).
+        Возвращает количество выбросов, границы и сами выбросы.
+        """
+        if column not in self.numeric_cols:
+            return None
+        
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        
+        outliers = self.df[(self.df[column] < lower_bound) | (self.df[column] > upper_bound)]
+        
+        return {
+            'count': len(outliers),
+            'lower_bound': lower_bound,
+            'upper_bound': upper_bound,
+            'indices': outliers.index.tolist()
+        }
+
+    def get_clean_dataframe(self, remove_outliers_cols=None):
+        """
+        Возвращает датафрейм без выбросов в указанных колонках.
+        """
+        if not remove_outliers_cols:
+            return self.df
+        
+        df_clean = self.df.copy()
+        
+        for col in remove_outliers_cols:
+            res = self.detect_outliers(col)
+            if res:
+                # Фильтруем по индексам
+                df_clean = df_clean.drop(res['indices'], errors='ignore')
+                
+        return df_clean

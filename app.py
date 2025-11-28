@@ -38,7 +38,7 @@ if uploaded_file is not None:
     else:
         # ... (дальше идет код создания вкладок tab1, tab2, tab3 как было раньше)
         # Создаем вкладки для удобства (как в ТЗ: Обзор, Статистика, Визуализация)
-        tab1, tab2, tab3 = st.tabs(["📋 Обзор данных", "📈 Статистика", "🎨 Визуализация"])
+        tab1, tab2, tab3, tab4 = st.tabs(["📋 Обзор", "📈 Статистика", "🎨 Визуализация", "🚀 Выбросы и Экспорт"])
 
         # === ВКЛАДКА 1: ОБЗОР ===
         with tab1:
@@ -119,6 +119,57 @@ if uploaded_file is not None:
                     val_counts = df[col_cat].value_counts().head(top_n)
                     sns.barplot(x=val_counts.values, y=val_counts.index, ax=ax, palette="viridis")
                     st.pyplot(fig)
+
+            # === ВКЛАДКА 4: ВЫБРОСЫ И ЭКСПОРТ ===
+        with tab4:
+            st.subheader("💡 Анализ выбросов (Метод IQR)")
+            
+            # Выбор колонки для проверки
+            outlier_col = st.selectbox("Проверить столбец на выбросы:", processor.numeric_cols)
+            
+            if outlier_col:
+                res = processor.detect_outliers(outlier_col)
+                
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Найдено выбросов", res['count'])
+                col2.metric("Нижняя граница", f"{res['lower_bound']:.2f}")
+                col3.metric("Верхняя граница", f"{res['upper_bound']:.2f}")
+                
+                if res['count'] > 0:
+                    st.warning(f"В столбце '{outlier_col}' найдено {res['count']} аномальных значений.")
+                    
+                    # Визуализация выбросов
+                    fig, ax = plt.subplots(figsize=(8, 4))
+                    sns.boxplot(x=df[outlier_col], ax=ax, color='orange')
+                    ax.set_title(f"Boxplot для {outlier_col} (с выбросами)")
+                    st.pyplot(fig)
+                else:
+                    st.success("Выбросов не обнаружено (распределение в пределах нормы).")
+
+            st.markdown("---")
+            st.subheader("📥 Скачивание обработанных данных")
+            
+            # Мультивыбор колонок для очистки
+            cols_to_clean = st.multiselect(
+                "Выберите столбцы, из которых удалить выбросы перед скачиванием:", 
+                processor.numeric_cols
+            )
+            
+            if st.button("Применить очистку и подготовить файл"):
+                clean_df = processor.get_clean_dataframe(cols_to_clean)
+                st.write(f"Размер исходного файла: {df.shape}")
+                st.write(f"Размер очищенного файла: {clean_df.shape}")
+                st.write(f"Удалено строк: {df.shape[0] - clean_df.shape[0]}")
+                
+                # Конвертация в CSV для скачивания
+                csv = clean_df.to_csv(index=False).encode('utf-8')
+                
+                st.download_button(
+                    label="⬇️ Скачать очищенный CSV",
+                    data=csv,
+                    file_name='cleaned_data.csv',
+                    mime='text/csv',
+                )
 
 else:
     # Заставка при пустом экране
