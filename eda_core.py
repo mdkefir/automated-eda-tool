@@ -3,11 +3,6 @@ import numpy as np
 from io import StringIO
 
 class EDAProcessor:
-    """
-    Класс для обработки данных и расчета статистик.
-    Выполняет аналитический этап работы.
-    """
-    
     def __init__(self, file_buffer, filename):
         self.filename = filename
         self.last_error = None # Сюда будем писать ошибку, если она случится
@@ -22,10 +17,6 @@ class EDAProcessor:
             self.categorical_cols = []
 
     def _load_data(self, file_buffer):
-        """
-        Пытается загрузить данные, перебирая кодировки.
-        Умеет пропускать "битые" строки.
-        """
         # 1. Excel
         if self.filename.endswith(('.xls', '.xlsx')):
             try:
@@ -38,7 +29,6 @@ class EDAProcessor:
         if self.filename.endswith('.csv'):
             from io import BytesIO
             
-            # Варианты кодировок и разделителей
             options = [
                 ('utf-8', ','),
                 ('utf-8', ';'),
@@ -163,6 +153,26 @@ class EDAProcessor:
                 df_clean = df_clean.drop(res['indices'], errors='ignore')
                 
         return df_clean
+
+    def get_outliers_dataframe(self, outlier_cols=None):
+        """
+        Возвращает датафрейм только с выбросами из указанных колонок.
+        Если выброс находится в нескольких колонках, строка включается один раз.
+        """
+        if not outlier_cols:
+            return pd.DataFrame()
+        
+        all_outlier_indices = set()
+        
+        for col in outlier_cols:
+            res = self.detect_outliers(col)
+            if res and res['indices']:
+                all_outlier_indices.update(res['indices'])
+        
+        if all_outlier_indices:
+            return self.df.loc[list(all_outlier_indices)].copy()
+        else:
+            return pd.DataFrame()
 
     def generate_insights(self):
         """
